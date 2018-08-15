@@ -1,0 +1,57 @@
+---
+kind: DeploymentConfig
+apiVersion: v1
+metadata:
+  name: "book-service"
+  annotations:
+    description: Deploy latest book service image
+    template.alpha.openshift.io/wait-for-ready: 'true'
+
+spec:
+  strategy:
+    type: Recreate
+
+  triggers:
+  - type: ImageChange
+    imageChangeParams:
+      automatic: true
+      containerNames:
+      - book-service
+      from:
+        kind: ImageStreamTag
+        namespace: heinlein
+        name: "book-service:latest"
+  - type: ConfigChange
+
+  replicas: 1
+  selector:
+    name: "book-service"
+
+  template:
+    metadata:
+      name: "book-service"
+      labels:
+        name: "book-service"
+
+    spec:
+      containers:
+      - name: book-service
+        image: " "
+        ports:
+        - containerPort: 8080
+
+      - name: book-service-sidecar
+        image: jboss/keycloak-proxy
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - mountPath: /opt/jboss/conf
+          name: proxy-config-volume
+
+      volumes:
+      - name: proxy-config-volume
+        configMap:
+          name: proxy-config
+          items:
+          - key: proxy.json
+            path: proxy.json
