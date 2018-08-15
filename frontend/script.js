@@ -19,15 +19,15 @@ const booksLoaded = function (books) {
 
 };
 
-const url = "//books-heinlein.apps.cc-openshift.de/";
+const url = "//backend-heinlein.apps.cc-openshift.de/";
 //var url = "http://localhost:8889/";
 
 
 $(function() {
     keycloak = Keycloak({
-        "url": "https://keycloak-heinlein.apps.cc-openshift.de/auth",
+        "url": "https://keycloak-https-heinlein.apps.cc-openshift.de/auth",
         "realm": "heinlein",
-        "clientId": "book-frontend"
+        "clientId": "frontend"
     });
 
     keycloak.init({ onLoad: 'login-required'}).success(function (authenticated) {
