@@ -60,6 +60,6 @@ class JwtMiddleware implements MiddlewareInterface {
     }
 
     protected function unauthorized(Response $response, string $msg) : Response {
-        return $response->withJson(["msg" => $msg], 400, JSON_PRETTY_PRINT);
+        return $response->withJson(["msg" => $msg], 401, JSON_PRETTY_PRINT);
     }
 }

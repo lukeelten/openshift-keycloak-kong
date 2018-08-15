@@ -17,9 +17,15 @@ return [
             'password' => getenv('MONGO_PASSWORD')
         ],
 
+        /*
         'keycloak' => [
             'url' => 'http://' . getenv("KEYCLOAK_SERVICE_HOST") . ":" . getenv("KEYCLOAK_SERVICE_PORT") . "/auth",
             'realm' => getenv("KEYCLOAK_REALM")
+        ],
+        */
+        'keycloak' => [
+            'url' => "https://keycloak-https-heinlein.apps.cc-openshift.de/auth",
+            'realm' => "heinlein"
         ]
     ],
 ];
