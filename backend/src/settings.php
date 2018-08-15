@@ -18,8 +18,8 @@ return [
         ],
 
         'keycloak' => [
-            'url' => 'https://keycloak-heinlein.apps.cc-openshift.de/auth/',
-            'realm' => 'heinlein'
+            'url' => 'http://' . getenv("KEYCLOAK_SERVICE_HOST") . ":" . getenv("KEYCLOAK_SERVICE_PORT") . "/auth",
+            'realm' => getenv("KEYCLOAK_REALM")
         ]
     ],
 ];
