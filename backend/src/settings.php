@@ -24,7 +24,7 @@ return [
         ],
         */
         'keycloak' => [
-            'url' => "https://keycloak-https-heinlein.apps.cc-openshift.de/auth",
+            'url' => "https://keycloak-https-heinlein.apps.cc-openshift.de/auth/",
             'realm' => "heinlein"
         ]
     ],
