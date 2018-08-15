@@ -1,0 +1,298 @@
+---
+kind: Template
+apiVersion: v1
+metadata:
+  name: keycloak
+  annotations:
+    iconClass: icon-sso
+    tags: keycloak
+    openshift.io/display-name: Keycloak
+    description: Keycloak Server Template
+parameters:
+  - displayName: Application Name
+    description: The name for the application.
+    name: APPLICATION_NAME
+    value: keycloak
+    required: true
+
+  - displayName: Keycloak Administrator Username
+    description: Keycloak Server administrator username
+    name: KEYCLOAK_USER
+    value: admin
+    required: true
+
+  - displayName: Keycloak Administrator Password
+    description: Keycloak Server administrator password
+    name: KEYCLOAK_PASSWORD
+    from: "[a-zA-Z0-9]{12}"
+    generate: expression
+    required: true
+
+  - displayName: PostgreSQL Username
+    description: Username for PostgreSQL database
+    name: POSTGRES_USER
+    value: keycloak
+    required: true
+
+  - displayName: PostgreSQL Password
+    description: Password for PostgreSQL database user
+    name: POSTGRES_PW
+    required: true
+    generate: expression
+    from: "[a-zA-Z0-9]{12}"
+
+  - description: Volume Capacity for PostgreSQL, e.g. 512Mi, 2Gi.
+    displayName: Volume Capacity
+    name: PG_VOLUME_CAPACITY
+    required: true
+    value: 1Gi
+
+objects:
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: keycloak-postgres
+  stringData:
+    database-user: "${POSTGRES_USER}"
+    database-password: "${POSTGRES_PW}"
+    database-name: keycloak
+
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: keycloak
+  stringData:
+    admin-username: "${KEYCLOAK_USER}"
+    admin-password: "${KEYCLOAK_PASSWORD}"
+
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    name: "${APPLICATION_NAME}-postgres"
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: "${PG_VOLUME_CAPACITY}"
+
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: "${APPLICATION_NAME}-postgres"
+    annotations:
+      template.alpha.openshift.io/wait-for-ready: 'true'
+    labels:
+      application: "${APPLICATION_NAME}-postgres"
+  spec:
+    replicas: 1
+    selector:
+      deploymentConfig: "${APPLICATION_NAME}-postgres"
+    strategy:
+      type: Recreate
+    triggers:
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+        - postgresql
+        from:
+          kind: ImageStreamTag
+          namespace: "openshift"
+          name: postgresql:latest
+    - type: ConfigChange
+    template:
+      metadata:
+        name: "${APPLICATION_NAME}-postgres"
+        labels:
+          deploymentConfig: "${APPLICATION_NAME}-postgres"
+          application: "${APPLICATION_NAME}"
+      spec:
+        securityContext:
+          runAsUser: 26
+          fsGroup: 26
+        restartPolicy: Always
+        volumes:
+          - name: "${APPLICATION_NAME}-postgres-data"
+            persistentVolumeClaim:
+              claimName: "${APPLICATION_NAME}-postgres"
+        containers:
+          - name: postgresql
+            image: " "
+            imagePullPolicy: Always
+            volumeMounts:
+              - mountPath: "/var/lib/pgsql/data"
+                name: "${APPLICATION_NAME}-postgres-data"
+            ports:
+              - containerPort: 5432
+                protocol: TCP
+            readinessProbe:
+              exec:
+                command:
+                  - "/usr/libexec/check-container"
+              initialDelaySeconds: 5
+              timeoutSeconds: 1
+            livenessProbe:
+              tcpSocket:
+                port: 5432
+              initialDelaySeconds: 10
+              timeoutSeconds: 1
+            securityContext:
+              privileged: false
+            terminationMessagePath: "/dev/termination-log"
+            env:
+              - name: POSTGRESQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: keycloak-postgres
+                    key: database-user
+              - name: POSTGRESQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: keycloak-postgres
+                    key: database-password
+              - name: POSTGRESQL_DATABASE
+                valueFrom:
+                  secretKeyRef:
+                    name: keycloak-postgres
+                    key: database-name
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: keycloak-postgres
+    labels:
+      application: "${APPLICATION_NAME}"
+  spec:
+    ports:
+      - name: postgres
+        protocol: TCP
+        port: 5432
+        targetPort: 5432
+    selector:
+      deploymentConfig: "${APPLICATION_NAME}-postgres"
+
+- kind: Service
+  apiVersion: v1
+  spec:
+    ports:
+    - port: 8080
+      targetPort: 8080
+    selector:
+      deploymentConfig: "${APPLICATION_NAME}"
+  metadata:
+    name: "${APPLICATION_NAME}"
+    labels:
+      application: "${APPLICATION_NAME}"
+    annotations:
+      description: Keycloak http port.
+
+
+- kind: Route
+  apiVersion: v1
+  id: "${APPLICATION_NAME}-http"
+  metadata:
+    name: "${APPLICATION_NAME}"
+    labels:
+      application: "${APPLICATION_NAME}"
+    annotations:
+      description: Route for keycloak's service.
+  spec:
+    to:
+      kind: Service
+      name: "${APPLICATION_NAME}"
+
+
+- kind: Route
+  apiVersion: v1
+  id: "${APPLICATION_NAME}-https"
+  metadata:
+    name: "${APPLICATION_NAME}-https"
+    labels:
+      application: "${APPLICATION_NAME}"
+    annotations:
+      description: Secure Route for keycloak's service.
+  spec:
+    to:
+      kind: Service
+      name: ${APPLICATION_NAME}
+    tls:
+      termination: edge
+
+
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: "${APPLICATION_NAME}"
+    labels:
+      application: "${APPLICATION_NAME}"
+  spec:
+    strategy:
+      type: Recreate
+    triggers:
+    - type: ConfigChange
+    replicas: 1
+    selector:
+      deploymentConfig: "${APPLICATION_NAME}"
+    template:
+      metadata:
+        name: "${APPLICATION_NAME}"
+        labels:
+          deploymentConfig: "${APPLICATION_NAME}"
+          application: "${APPLICATION_NAME}"
+      spec:
+        securityContext:
+          runAsUser: 1000
+          fsGroup: 1000
+        containers:
+        - name: "${APPLICATION_NAME}"
+          image: jboss/keycloak-openshift
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+            name: http
+          - name: https
+            containerPort: 8443
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: "/auth/realms/master"
+              port: 8080
+            initialDelaySeconds: 10
+            periodsSeconds: 10
+            timeoutSeconds: 1
+            failureThreashold: 5
+          env:
+          - name: KEYCLOAK_USER
+            valueFrom:
+              secretKeyRef:
+                name: keycloak
+                key: admin-username
+          - name: KEYCLOAK_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: keycloak
+                key: admin-password
+          - name: PROXY_ADDRESS_FORWARDING
+            value: "true"
+          - name: DB_VENDOR
+            value: "POSTGRES"
+          - name: DB_ADDR
+            value: "${env.KEYCLOAK_POSTGRES_SERVICE_HOST}"
+          - name: DB_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-postgres
+                key: database-name
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-postgres
+                key: database-user
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-postgres
+                key: database-password
+          securityContext:
+            privileged: false

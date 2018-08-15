@@ -1,0 +1,301 @@
+apiVersion: v1
+kind: Template
+labels:
+  group: infrastructure
+metadata:
+  annotations:
+    openshift.io/display-name: Kong
+    description: Creates the API gateway Kong for microservices.
+    tags: instant-app,kong
+  name: kong
+objects:
+
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-data-claim"
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: "1Gi"
+
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: kong-postgres
+  stringData:
+    database-user: "kong"
+    database-password: "${POSTGRESQL_PASSWORD}"
+    database-name: "kong"
+
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}"
+    annotations:
+      template.alpha.openshift.io/wait-for-ready: 'true'
+  spec:
+    replicas: 1
+    selector:
+      deploymentConfig: "${DATABASE_SERVICE_NAME}"
+    strategy:
+      type: Recreate
+    triggers:
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+        - postgresql
+        from:
+          kind: ImageStreamTag
+          namespace: "openshift"
+          name: postgresql:latest
+    - type: ConfigChange
+    template:
+      metadata:
+        name: "${DATABASE_SERVICE_NAME}"
+        labels:
+          deploymentConfig: "${DATABASE_SERVICE_NAME}"
+      spec:
+        securityContext:
+          runAsUser: 26
+          fsGroup: 26
+        restartPolicy: Always
+        volumes:
+        - name: "${DATABASE_SERVICE_NAME}-data"
+          persistentVolumeClaim:
+            claimName: "${DATABASE_SERVICE_NAME}-data-claim"
+        containers:
+        - name: postgresql
+          image: " "
+          imagePullPolicy: Always
+          volumeMounts:
+          - mountPath: "/var/lib/pgsql/data"
+            name: "${DATABASE_SERVICE_NAME}-data"
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - "/usr/libexec/check-container"
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 10
+            timeoutSeconds: 1
+          terminationMessagePath: "/dev/termination-log"
+          env:
+          - name: POSTGRESQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: kong-postgres
+                key: database-user
+          - name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: kong-postgres
+                key: database-password
+          - name: POSTGRESQL_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: kong-postgres
+                key: database-name
+
+
+
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: kong
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: kong
+    strategy:
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          app: kong
+          deploymentconfig: kong
+      spec:
+        containers:
+        - name: kong
+          image: "library/kong:${KONG_BUILD_TAG}"
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: KONG_PG_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: kong-postgres
+                key: database-password
+          - name: KONG_ADMIN_LISTEN
+            value: "0.0.0.0:8000"
+          - name: KONG_ADMIN_LISTEN_SSL
+            value: "0.0.0.0:8444"
+          - name: KONG_PG_HOST
+            value: "${DATABASE_SERVICE_NAME}.${PROJECT_NAME}.svc"
+          - name: KONG_HOST_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          command: [ "/bin/sh", "-c", "export KONG_CLUSTER_ADVERTISE=$(KONG_HOST_IP):7946; export KONG_NGINX_DAEMON='off'; kong migrations up; kong start" ]
+          ports:
+          - name: admin
+            containerPort: 8001
+            protocol: TCP
+          - name: proxy
+            containerPort: 8000
+            protocol: TCP
+          - name: proxy-ssl
+            containerPort: 8443
+            protocol: TCP
+          - name: surf-tcp
+            containerPort: 7946
+            protocol: TCP
+          - name: surf-udp
+            containerPort: 7946
+            protocol: UDP
+          terminationMessagePath: /dev/termination-log
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        securityContext:
+          runAsUser: 0
+        terminationGracePeriodSeconds: 30
+    test: false
+    triggers:
+    - type: ConfigChange
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}"
+  spec:
+    ports:
+    - name: postgresql
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+    selector:
+      deploymentConfig: "${DATABASE_SERVICE_NAME}"
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: kong-proxy
+  spec:
+    ports:
+    - name: kong-proxy
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: kong-proxy-ssl
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+    selector:
+      app: kong
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: kong-admin
+  spec:
+    ports:
+    - name: kong-admin
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    selector:
+      app: kong
+
+- kind: Route
+  apiVersion: v1
+  id: "kong-http"
+  metadata:
+    name: "kong-http"
+    labels:
+      application: "kong"
+    annotations:
+      description: Route for kong http proxy.
+  spec:
+    port:
+      targetPort: kong-proxy
+    to:
+      kind: Service
+      name: "kong-proxy"
+
+- kind: Route
+  apiVersion: v1
+  id: "kong-https"
+  metadata:
+    name: "kong-https"
+    labels:
+      application: "kong"
+    annotations:
+      description: Route for kong https proxy.
+  spec:
+    port:
+      targetPort: kong-proxy-ssl
+    to:
+      kind: Service
+      name: "kong-proxy"
+    tls:
+      termination: passthrough
+
+- kind: Route
+  apiVersion: v1
+  id: "kong-admin"
+  metadata:
+    name: "kong-admin"
+    labels:
+      application: "kong"
+    annotations:
+      description: Route for kong admin.
+  spec:
+    port:
+      targetPort: kong-admin
+    to:
+      kind: Service
+      name: "kong-admin"
+
+parameters:
+- name: PROJECT_NAME
+  displayName: Database Namespace
+  description: The namespace of the database.
+  value: gateway
+  required: true
+- name: DATABASE_SERVICE_NAME
+  displayName: Database Service Name
+  description: The name of the OpenShift Service exposed for the database.
+  value: kong-postgresql
+  required: true
+- name: POSTGRESQL_PASSWORD
+  displayName: PostgreSQL Connection Password
+  description: Password for the PostgreSQL connection user.
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+  required: true
+- name: KONG_IMAGE_NAME
+  displayName: kong container image name
+  description: 'Name of the kong container image to be used'
+  value: 'kong'
+  required: true
+- name: KONG_BUILD_TAG
+  displayName: kong image tag
+  description: kong image tag (0.10, latest, etc.)
+  value: "0.14.0-centos"
+  required: true
