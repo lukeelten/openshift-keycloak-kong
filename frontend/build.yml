@@ -1,0 +1,48 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftWebConsole
+  creationTimestamp: '2018-08-13T11:45:45Z'
+  labels:
+    app: book-frontend
+  name: book-frontend
+  namespace: heinlein
+  resourceVersion: '6244416'
+  selfLink: /apis/build.openshift.io/v1/namespaces/heinlein/buildconfigs/book-frontend
+  uid: 6a212ba9-9eee-11e8-9fb6-0200da2d3d00
+spec:
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'book-frontend:latest'
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    git:
+      ref: master
+      uri: 'https://github.com/lukeelten/openshift-book-frontend.git'
+    type: Git
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: 'nginx:latest'
+        namespace: openshift
+    type: Source
+  triggers:
+  - imageChange:
+      lastTriggeredImageID: >-
+        docker.io/centos/nginx-112-centos7@sha256:ea66c2a95cebd279fa75308b82b984d23bbf29ac95523657f2132dcecca5093d
+    type: ImageChange
+  - type: ConfigChange
+  - generic:
+      secret: 64bc8ad68987b209
+    type: Generic
+  - github:
+      secret: ea2bd508960bd5ef
+    type: GitHub
+status:
+  lastVersion: 2
