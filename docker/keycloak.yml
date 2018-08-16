@@ -4,6 +4,9 @@ volumes:
   postgres_keycloak:
     driver: local
 
+networks:
+  keycloak-network:
+    driver: bridge
 
 services:
   postgres-keycloak:
@@ -14,6 +17,8 @@ services:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: password
+    networks:
+      - keycloak-network
 
   keycloak:
     image: jboss/keycloak
@@ -33,3 +38,5 @@ services:
       - 8443
     depends_on:
       - postgres-keycloak
+    networks:
+      - keycloak-network
