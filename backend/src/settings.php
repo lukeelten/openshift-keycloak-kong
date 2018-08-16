@@ -13,12 +13,6 @@ return [
             'level' => \Monolog\Logger::DEBUG,
         ],
 
-        'db' => [
-            'host' => getenv('MONGO_HOST'),
-            'username' => getenv('MONGO_USER'),
-            'password' => getenv('MONGO_PASSWORD')
-        ],
-
         'keycloak' => [
             'url' => 'http://' . getenv($keycloakService . "_SERVICE_HOST") . ":" . getenv($keycloakService . "_SERVICE_PORT") . "/auth/",
             'realm' => getenv("KEYCLOAK_REALM")
