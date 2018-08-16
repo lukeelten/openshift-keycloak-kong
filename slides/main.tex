@@ -1,0 +1,66 @@
+% !TeX spellcheck = de_DE
+\documentclass[aspectratio=169]{beamer}
+
+\usetheme[progressbar=frametitle]{metropolis}
+\usepackage{appendixnumberbeamer}
+
+\usepackage{booktabs}
+
+\usepackage{pgfplots}
+\usepgfplotslibrary{dateplot}
+
+\usepackage{soul}
+\usepackage{xspace}
+
+\titlegraphic{\hfill\includegraphics[height=3.5cm]{img/logo}}
+
+
+\title{OpenShift / Keycloak SSO / Kong}
+\subtitle{Nachmittag Session}
+
+\date{17. August 2018}
+
+\author{Tobias Derksen \& Gerald Schmidt}
+\institute{codecentric AG / Berlin}
+
+\begin{document}
+
+% Title Frame
+\maketitle
+
+% Agenda
+\begin{frame}{Agenda}
+	\setbeamertemplate{section in toc}[sections numbered]
+	\tableofcontents[hideallsubsections]
+\end{frame}
+
+
+\input{auth}
+\input{keycloak}
+\input{kong}
+
+\begin{frame}{Microservice Architektur}
+	\begin{figure}
+		\centering
+		\includegraphics[height=0.85\textheight]{img/setup_basic}
+	\end{figure}
+\end{frame}
+
+
+\begin{frame}{Microservice Architektur (mit Kong)}
+	\begin{figure}
+		\centering
+		\includegraphics[height=0.85\textheight]{img/setup_kong}
+	\end{figure}
+\end{frame}
+
+
+\begin{frame}[standout]
+Integrated Prototype
+\end{frame}
+
+
+\input{advanced}
+
+
+\end{document}

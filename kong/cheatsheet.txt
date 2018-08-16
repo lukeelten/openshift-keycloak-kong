@@ -1,0 +1,37 @@
+#!/bin/bash
+
+curl -i -X POST --url http://localhost:8001/services/ --data 'name=book-service' --data 'url=http://books:8080'
+curl -i -X POST --url http://localhost:8001/services/book-service/routes --data 'hosts[]=books'
+curl -i -X GET --url http://localhost:8000 --header 'Host: books'
+curl -i -X POST --url http://localhost:8001/services/book-service/plugins --data "name=jwt"
+curl -i -X POST --url http://localhost:8001/consumers --data "username=keycloak"
+curl -i -X POST --url http://localhost:8001/consumers/keycloak/jwt --data "key=http://keycloak:8080/auth/realms/heinlein" --data "algorithm=RS256" --data-urlencode "rsa_public_key=[[\"
+curl -i -X GET --url http://localhost:8001/plugins
+curl -i -X PATCH --url http://localhost:8001/plugins/ec887141-781a-4d6a-b671-a9ea3a56ffe4 --data "config.claims_to_verify=exp,nbf"
+curl -i -X GET --url http://keycloak:8080/auth/realms/heinlein/authenticate
+curl -i -X GET --url http://keycloak:8080/auth/realms/heinlein/protocol/openid-connect/token
+curl -i -X POST --url http://keycloak:8080/auth/realms/heinlein/protocol/openid-connect/token
+
+
+oc project heinlein
+oc adm policy add-scc-to-user anyuid -z default
+
+-----BEGIN PUBLIC KEY-----
+-----END PUBLIC KEY-----
+
+
+curl -X POST http://kong:8001/upstreams \
+    --data "name=address.v1.service"
+
+
+curl -X POST http://kong:8001/upstreams/address.v1.service/targets \
+    --data "target=192.168.34.15:80"
+    --data "weight=100"
+
+curl -X POST http://kong:8001/services/ \
+    --data "name=address-service" \
+    --data "host=address.v1.service" \
+    --data "path=/address"
+
+curl -X POST http://kong:8001/services/address-service/routes/ \
+    --data "hosts[]=address.mydomain.com"
