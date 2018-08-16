@@ -142,7 +142,7 @@ objects:
                 name: kong-postgres
                 key: database-password
           - name: KONG_ADMIN_LISTEN
-            value: "0.0.0.0:8000"
+            value: "0.0.0.0:8001"
           - name: KONG_ADMIN_LISTEN_SSL
             value: "0.0.0.0:8444"
           - name: KONG_PG_HOST
@@ -156,6 +156,9 @@ objects:
           ports:
           - name: admin
             containerPort: 8001
+            protocol: TCP
+          - name: admin-ssl
+            containerPort: 8444
             protocol: TCP
           - name: proxy
             containerPort: 8000
