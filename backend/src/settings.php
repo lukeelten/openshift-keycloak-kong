@@ -1,4 +1,6 @@
 <?php
+$keycloakService = strtoupper(getenv("KEYCLOAK_SERVICE"));
+
 return [
     'settings' => [
         'displayErrorDetails' => true, // set to false in production
@@ -17,15 +19,9 @@ return [
             'password' => getenv('MONGO_PASSWORD')
         ],
 
-        /*
         'keycloak' => [
-            'url' => 'http://' . getenv("KEYCLOAK_SERVICE_HOST") . ":" . getenv("KEYCLOAK_SERVICE_PORT") . "/auth",
+            'url' => 'http://' . getenv($keycloakService . "_SERVICE_HOST") . ":" . getenv($keycloakService . "_SERVICE_PORT") . "/auth/",
             'realm' => getenv("KEYCLOAK_REALM")
-        ],
-        */
-        'keycloak' => [
-            'url' => "https://keycloak-https-heinlein.apps.cc-openshift.de/auth/",
-            'realm' => "heinlein"
         ]
     ],
 ];
