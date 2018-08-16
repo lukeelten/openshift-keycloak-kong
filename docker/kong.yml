@@ -45,3 +45,7 @@ services:
       KONG_PG_HOST: postgres-kong
     command: kong migrations up
 
+  rest:
+    image: lukeelten/simple-rest
+    ports:
+      - 9090:8080

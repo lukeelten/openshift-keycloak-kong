@@ -19,9 +19,7 @@ const booksLoaded = function (books) {
 
 };
 
-const url = "//backend-heinlein.apps.cc-openshift.de/";
-//var url = "http://localhost:8889/";
-
+const url = "https://backend-kong-heinlein.apps.cc-openshift.de/";
 
 $(function() {
     keycloak = Keycloak({
