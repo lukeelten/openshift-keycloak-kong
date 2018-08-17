@@ -1,0 +1,34 @@
+{
+  "target-url":"http://localhost:8080",
+  "bind-address":"0.0.0.0",
+  "http-port":"8000",
+  "send-access-token": true,
+  "applications": [
+    {
+      "base-path":"/",
+      "proxy-address-forwarding": true,
+      "adapter-config":{
+        "realm":"heinlein",
+        "auth-server-url":"http://keycloak:8080/auth",
+        "ssl-required":"external",
+        "resource":"book-service",
+        "credentials":{
+          "secret":"2b1258b9-a6d8-40e9-96ba-9e39589c8f71"
+        }
+      },
+      "constraints": [
+        {
+          "pattern":"/*",
+          "authenticate": true
+        },
+        {
+          "pattern":"/",
+          "authenticate": true
+        }
+      ]
+    }
+  ],
+  "header-names": {
+    "keycloak-access-token": "X-KEYCLOAK-TOKEN"
+  }
+}
