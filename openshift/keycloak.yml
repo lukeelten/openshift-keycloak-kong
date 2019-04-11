@@ -28,149 +28,39 @@ parameters:
     generate: expression
     required: true
 
-  - displayName: PostgreSQL Username
+  - displayName: Datenbank Adresse
     description: Username for PostgreSQL database
-    name: POSTGRES_USER
-    value: keycloak
+    name: DB_HOST
     required: true
 
-  - displayName: PostgreSQL Password
+  - displayName: Datenbank Name
+    description: Username for PostgreSQL database
+    name: DB_NAME
+    required: true
+
+  - displayName: Datenbank Username
+    description: Username for PostgreSQL database
+    name: DB_USER
+    required: true
+
+  - displayName: Datenbank Password
     description: Password for PostgreSQL database user
-    name: POSTGRES_PW
+    name: DB_PASSWORD
     required: true
-    generate: expression
-    from: "[a-zA-Z0-9]{12}"
-
-  - description: Volume Capacity for PostgreSQL, e.g. 512Mi, 2Gi.
-    displayName: Volume Capacity
-    name: PG_VOLUME_CAPACITY
-    required: true
-    value: 1Gi
 
 objects:
-- kind: Secret
-  apiVersion: v1
-  metadata:
-    name: keycloak-postgres
-  stringData:
-    database-user: "${POSTGRES_USER}"
-    database-password: "${POSTGRES_PW}"
-    database-name: keycloak
 
 - kind: Secret
   apiVersion: v1
   metadata:
-    name: keycloak
+    name: "${APPLICATION_NAME}"
+    labels:
+      app: "${APPLICATION_NAME}"
   stringData:
     admin-username: "${KEYCLOAK_USER}"
     admin-password: "${KEYCLOAK_PASSWORD}"
-
-- kind: PersistentVolumeClaim
-  apiVersion: v1
-  metadata:
-    name: "${APPLICATION_NAME}-postgres"
-  spec:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: "${PG_VOLUME_CAPACITY}"
-
-- kind: DeploymentConfig
-  apiVersion: v1
-  metadata:
-    name: "${APPLICATION_NAME}-postgres"
-    annotations:
-      template.alpha.openshift.io/wait-for-ready: 'true'
-    labels:
-      application: "${APPLICATION_NAME}-postgres"
-  spec:
-    replicas: 1
-    selector:
-      deploymentConfig: "${APPLICATION_NAME}-postgres"
-    strategy:
-      type: Recreate
-    triggers:
-    - type: ImageChange
-      imageChangeParams:
-        automatic: true
-        containerNames:
-        - postgresql
-        from:
-          kind: ImageStreamTag
-          namespace: "openshift"
-          name: postgresql:latest
-    - type: ConfigChange
-    template:
-      metadata:
-        name: "${APPLICATION_NAME}-postgres"
-        labels:
-          deploymentConfig: "${APPLICATION_NAME}-postgres"
-          application: "${APPLICATION_NAME}"
-      spec:
-        securityContext:
-          runAsUser: 26
-          fsGroup: 26
-        restartPolicy: Always
-        volumes:
-          - name: "${APPLICATION_NAME}-postgres-data"
-            persistentVolumeClaim:
-              claimName: "${APPLICATION_NAME}-postgres"
-        containers:
-          - name: postgresql
-            image: " "
-            imagePullPolicy: Always
-            volumeMounts:
-              - mountPath: "/var/lib/pgsql/data"
-                name: "${APPLICATION_NAME}-postgres-data"
-            ports:
-              - containerPort: 5432
-                protocol: TCP
-            readinessProbe:
-              exec:
-                command:
-                  - "/usr/libexec/check-container"
-              initialDelaySeconds: 5
-              timeoutSeconds: 1
-            livenessProbe:
-              tcpSocket:
-                port: 5432
-              initialDelaySeconds: 10
-              timeoutSeconds: 1
-            securityContext:
-              privileged: false
-            terminationMessagePath: "/dev/termination-log"
-            env:
-              - name: POSTGRESQL_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: keycloak-postgres
-                    key: database-user
-              - name: POSTGRESQL_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: keycloak-postgres
-                    key: database-password
-              - name: POSTGRESQL_DATABASE
-                valueFrom:
-                  secretKeyRef:
-                    name: keycloak-postgres
-                    key: database-name
-
-- kind: Service
-  apiVersion: v1
-  metadata:
-    name: keycloak-postgres
-    labels:
-      application: "${APPLICATION_NAME}"
-  spec:
-    ports:
-      - name: postgres
-        protocol: TCP
-        port: 5432
-        targetPort: 5432
-    selector:
-      deploymentConfig: "${APPLICATION_NAME}-postgres"
+    database-user: "${DB_USER}"
+    database-password: "${DB_PASSWORD}"
 
 - kind: Service
   apiVersion: v1
@@ -179,13 +69,11 @@ objects:
     - port: 8080
       targetPort: 8080
     selector:
-      deploymentConfig: "${APPLICATION_NAME}"
+      app: "${APPLICATION_NAME}"
   metadata:
     name: "${APPLICATION_NAME}"
     labels:
-      application: "${APPLICATION_NAME}"
-    annotations:
-      description: Keycloak http port.
+      app: "${APPLICATION_NAME}"
 
 
 - kind: Route
@@ -194,9 +82,7 @@ objects:
   metadata:
     name: "${APPLICATION_NAME}"
     labels:
-      application: "${APPLICATION_NAME}"
-    annotations:
-      description: Route for keycloak's service.
+      app: "${APPLICATION_NAME}"
   spec:
     to:
       kind: Service
@@ -209,9 +95,7 @@ objects:
   metadata:
     name: "${APPLICATION_NAME}-https"
     labels:
-      application: "${APPLICATION_NAME}"
-    annotations:
-      description: Secure Route for keycloak's service.
+      app: "${APPLICATION_NAME}"
   spec:
     to:
       kind: Service
@@ -225,7 +109,7 @@ objects:
   metadata:
     name: "${APPLICATION_NAME}"
     labels:
-      application: "${APPLICATION_NAME}"
+      app: "${APPLICATION_NAME}"
   spec:
     strategy:
       type: Recreate
@@ -233,20 +117,19 @@ objects:
     - type: ConfigChange
     replicas: 1
     selector:
-      deploymentConfig: "${APPLICATION_NAME}"
+      app: "${APPLICATION_NAME}"
     template:
       metadata:
         name: "${APPLICATION_NAME}"
         labels:
-          deploymentConfig: "${APPLICATION_NAME}"
-          application: "${APPLICATION_NAME}"
+          app: "${APPLICATION_NAME}"
       spec:
-        securityContext:
-          runAsUser: 1000
-          fsGroup: 1000
+#        securityContext:
+#          runAsUser: 1000
+#          fsGroup: 1000
         containers:
         - name: "${APPLICATION_NAME}"
-          image: jboss/keycloak-openshift
+          image: jboss/keycloak:5.0.0
           ports:
           - containerPort: 8080
             protocol: TCP
@@ -256,43 +139,49 @@ objects:
             protocol: TCP
           readinessProbe:
             httpGet:
-              path: "/auth/realms/master"
+              path: "/auth/realms/master/.well-known/openid-configuration"
               port: 8080
             initialDelaySeconds: 10
-            periodsSeconds: 10
-            timeoutSeconds: 1
+            periodsSeconds: 15
+            timeoutSeconds: 3
             failureThreashold: 5
+            successThreshold: 1
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 20
+            periodsSeconds: 10
+            timeoutSeconds: 3
+            failureThreashold: 6
+            successThreshold: 1
           env:
           - name: KEYCLOAK_USER
             valueFrom:
               secretKeyRef:
-                name: keycloak
+                name: "${APPLICATION_NAME}"
                 key: admin-username
           - name: KEYCLOAK_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: keycloak
+                name: "${APPLICATION_NAME}"
                 key: admin-password
           - name: PROXY_ADDRESS_FORWARDING
             value: "true"
           - name: DB_VENDOR
-            value: "POSTGRES"
+            value: "MARIADB"
           - name: DB_ADDR
-            value: "${env.KEYCLOAK_POSTGRES_SERVICE_HOST}"
+            value: "${DB_HOST}"
           - name: DB_DATABASE
-            valueFrom:
-              secretKeyRef:
-                name: keycloak-postgres
-                key: database-name
+            value: "${DB_NAME}"
           - name: DB_USER
             valueFrom:
               secretKeyRef:
-                name: keycloak-postgres
+                name: "${APPLICATION_NAME}"
                 key: database-user
           - name: DB_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: keycloak-postgres
+                name: "${APPLICATION_NAME}"
                 key: database-password
           securityContext:
             privileged: false

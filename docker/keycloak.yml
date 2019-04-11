@@ -30,9 +30,7 @@ services:
       DB_PASSWORD: password
       KEYCLOAK_USER: admin
       KEYCLOAK_PASSWORD: password
-    ports:
-      - 8080:8080
-      - 8443:8443
+      PROXY_ADDRESS_FORWARDING: "true"
     expose:
       - 8080
       - 8443
